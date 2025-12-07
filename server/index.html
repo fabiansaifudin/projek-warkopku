@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en" >
+<head>
+  <meta charset="UTF-8">
+  <title>CodePen - ChartJs Realtime Performance Test</title>
+  <link rel="stylesheet" href="./style.css">
+
+</head>
+<body>
+<!-- partial:index.partial.html -->
+<p>
+  <button id="addDataset">Add Dataset</button>
+  <button id="removeDataset">Remove Dataset</button>
+  <button id="addData">Add Data</button>
+  <button id="stopData">Stop Data Feed</button>
+  <button id="pauseGraph">Pause Graph</button>
+  <select id="frameRate">
+    <option value=1>1 FPS</option>
+    <option value=5>5 FPS</option>
+    <option value=10>10 FPS</option>
+    <option value=15>15 FPS</option>
+    <option value=20>20 FPS</option>
+    <option value=30>30 FPS</option>
+    <option value=60>60 FPS</option>
+  </select>
+  <select id="duration">
+    <option value=10000>10s</option>
+    <option value=20000>20s</option>
+    <option value=30000>30s</option>
+    <option value=60000>1min</option>
+    <option value=120000>2min</option>
+    <option value=300000>5min</option>
+  </select>
+  <span id="datapoints">0</span><span> Datapoints</span>
+</p>
+<div class="chart-container" style="position:relative;height:80vh; width:90vw">
+  <canvas id="myChart"></canvas>
+</div>
+<!-- partial -->
+  <script src='https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.1/moment.min.js'></script>
+<script src='https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.9.4/Chart.min.js'></script>
+<script src='https://cdn.jsdelivr.net/npm/chartjs-plugin-streaming@1.8.0'></script>
+<script>
+    var chartColors = {
+  red: "rgb(255, 99, 132)",
+  orange: "rgb(255, 159, 64)",
+  yellow: "rgb(255, 205, 86)",
+  green: "rgb(75, 192, 192)",
+  blue: "rgb(54, 162, 235)",
+  purple: "rgb(153, 102, 255)",
+  grey: "rgb(201, 203, 207)"
+};
+
+function randomScalingFactor(previousValue) {
+  return (
+    previousValue +
+    (Math.random() > 0.5 ? 1.0 : -1.0) * Math.round(Math.random() * 25)
+  );
+}
+
+function onRefresh(chart) {
+  if (stopData) return;
+  var datapoints = 0;
+  chart.config.data.datasets.forEach(function (dataset) {
+    dataset.data.push({
+      x: Date.now(),
+      y: randomScalingFactor(
+        dataset.data.length > 0 ? dataset.data[dataset.data.length - 1].y : 0
+      )
+    });
+    datapoints += dataset.data.length;
+  });
+  datapointsElement.innerText = datapoints;
+}
+
+var color = Chart.helpers.color;
+var config = {
+  type: "line",
+  data: {
+    datasets: [
+      {
+        label: "Channel 1",
+        backgroundColor: "rgba(255, 0, 0, 0.7)",
+        borderColor: "rgba(255, 0, 0, 0.7)",
+        borderWidth: 2,
+        fill: false,
+        lineTension: 0,
+        yAxisID: "right",
+        data: []
+      },
+      {
+        label: "Channel 2",
+        backgroundColor: color(chartColors.blue).alpha(1).rgbString(),
+        borderColor: chartColors.blue,
+        borderWidth: 1.5,
+        fill: false,
+        lineTension: 0,
+        data: []
+      }
+    ]
+  },
+  options: {
+    maintainAspectRatio: false,
+    elements: {
+      point: {
+        radius: 0
+      }
+    },
+    //responsiveAnimationDuration: 0, // animation duration after a resize
+    title: {
+      display: true,
+      text: "Line chart (hotizontal scroll) sample"
+    },
+    scales: {
+      xAxes: [
+        {
+          type: "realtime",
+          gridLines: {
+            display: true
+          },
+          time: {
+            unit: "second",
+            stepSize: 1,
+            round: true,
+            displayFormats: {
+              minute: "HH:mm",
+              second: "HH:mm:ss"
+            }
+          },
+          realtime: {
+            duration: 10 * 1000,
+            refresh: 10,
+            delay: 200,
+            onRefresh: onRefresh
+          }
+        }
+      ],
+      yAxes: [
+        {
+          scaleLabel: {
+            display: true,
+            labelString: "value"
+          }
+        },
+        {
+          id: "right",
+          position: "right",
+          ticks: {
+            fontColor: "rgba(255, 0, 0, 0.7)"
+          },
+          gridLines: {
+            color: "rgba(255, 0, 0, 0.7)",
+            drawOnChartArea: false
+          },
+          scaleLabel: {
+            display: true,
+            labelString: "another",
+            fontColor: "rgba(255, 0, 0, 0.7)"
+          }
+        }
+      ]
+    },
+    tooltips: {
+      mode: "nearest",
+      intersect: false
+    },
+    hover: {
+      mode: "nearest",
+      intersect: false
+    },
+    plugins: {
+      streaming: {
+        frameRate: 60
+      }
+    }
+  }
+};
+
+window.onload = function () {
+  var ctx = document.getElementById("myChart").getContext("2d");
+  window.myChart = new Chart(ctx, config);
+};
+var datapointsElement = document.getElementById("datapoints");
+
+var colorNames = Object.keys(chartColors);
+document.getElementById("addDataset").addEventListener("click", function () {
+  var colorName = colorNames[config.data.datasets.length % colorNames.length];
+  var newColor = chartColors[colorName];
+  var newDataset = {
+    label: "Channel " + (config.data.datasets.length + 1),
+    backgroundColor: color(newColor).alpha(1).rgbString(),
+    borderColor: newColor,
+    borderWidth: 1,
+    fill: false,
+    lineTension: 0,
+    data: []
+  };
+
+  config.data.datasets.push(newDataset);
+  window.myChart.update();
+});
+
+document.getElementById("removeDataset").addEventListener("click", function () {
+  config.data.datasets.pop();
+  window.myChart.update();
+});
+
+document.getElementById("addData").addEventListener("click", function () {
+  onRefresh(window.myChart);
+  window.myChart.update();
+});
+
+document.getElementById("pauseGraph").addEventListener("click", function () {
+  window.myChart.options.scales.xAxes[0].realtime.pause = !window.myChart
+    .options.scales.xAxes[0].realtime.pause;
+  //window.myChart.update({duration: 0});
+});
+
+document.getElementById("frameRate").addEventListener("change", function () {
+  window.myChart.options.plugins.streaming.frameRate = +this.value;
+  window.myChart.update({ duration: 0 });
+  //window.myChart.update({duration: 0});
+});
+
+document.getElementById("duration").addEventListener("change", function () {
+  var rate = document.getElementById("duration").value;
+  window.myChart.options.scales.xAxes[0].realtime.duration = +this.value;
+  //window.myChart.update({duration: 0});
+});
+
+var stopData = false;
+document.getElementById("stopData").addEventListener("click", function () {
+  stopData = !stopData;
+});
+</script>
+
+</body>
+</html>
