@@ -1,4 +1,4 @@
-# Nama Proyek
+# Warkop App
 
 Deskripsi singkat: apa yang dilakukan proyek ini dan target penggunanya.
 
